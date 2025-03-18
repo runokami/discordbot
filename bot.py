@@ -158,3 +158,18 @@ async def prefix(ctx, new_prefix):
 @bot.command()
 async def embed_oluştur(ctx, ad: str, başlık: str, açıklama: str, renk: str = "#00FF00", görsel_url: str = None, footer_metni: str = None):
     if not re.match(r'^#([0-9A-Fa-f]{6})$', renk):
+        await ctx.send("Geçersiz renk kodu. #ffffff formatında bir hex renk kodu girin.")
+        return  # Hata durumunda fonksiyondan çık
+    
+    color = hex_to_int(renk)
+    embeds = load_embeds()
+    embeds[ad] = {
+        "baslik": baslik,
+        "aciklama": aciklama,
+        "renk": color,
+        "gorsel_url": gorsel_url,
+        "footer_metni": footer_metni,
+        "olusturan": str(ctx.author.id)
+    }
+    save_embeds(embeds)
+    await ctx.send(f"'{ad}' adında embed oluşturuldu.")
