@@ -1,6 +1,5 @@
 discord.py
 Pillow
-JSON
 random
 os
 re
