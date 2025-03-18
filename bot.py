@@ -1,10 +1,15 @@
 import discord
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont
-import sqlite3
-import random
-import os
-import re
+
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+tree = discord.app_commands.CommandTree(bot)  # Doğru yer burası!
+
+@bot.event
+async def on_ready():
+    print(f"{bot.user} olarak giriş yaptık!")
+    await tree.sync()
 
 TOKEN = os.environ.get("DISCORD_TOKEN")
 PREFIX = "!"
@@ -173,3 +178,5 @@ async def embed_oluştur(ctx, ad: str, başlık: str, açıklama: str, renk: str
     }
     save_embeds(embeds)
     await ctx.send(f"'{ad}' adında embed oluşturuldu.")
+
+bot.run(TOKEN)
