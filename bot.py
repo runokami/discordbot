@@ -13,7 +13,7 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)  # help_command=None ile varsayılan help komutunu devre dışı bırakıyoruz
 
 # Embed'leri saklamak için JSON dosyasının yolu
-EMBEDS_FILE = 'embeds/embeds.json'
+EMBEDS_FILE = 'embeds.json'
 
 # Embed'leri dosyadan yüklemek için fonksiyon
 def load_embeds():
