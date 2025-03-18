@@ -27,6 +27,18 @@ def save_embeds(embeds):
     with open(EMBEDS_FILE, 'w') as file:
         json.dump(embeds, file, indent=4)
 
+# Embed listeleme komutu
+@bot.command()
+async def embed_list(ctx):
+    embeds = load_embeds()
+    
+    if not embeds:
+        await ctx.send("Şu anda herhangi bir embed bulunmuyor.")
+        return
+    
+    embed_names = "\n".join([f"- {embed}" for embed in embeds.keys()])
+    await ctx.send(f"Mevcut embed'ler:\n{embed_names}")
+
 # Embed oluşturma komutu
 @bot.command()
 @commands.has_permissions(manage_messages=True)
@@ -46,7 +58,14 @@ async def embed_create(ctx, embed_name):
 
     # Embed'leri kaydediyoruz
     save_embeds(embeds)
-    await ctx.send(f"'{embed_name}' adlı embed başarıyla oluşturuldu.")
+    
+    # Embed'in önizlemesini gönderiyoruz
+    embed = discord.Embed(
+        title=embeds[embed_name]["title"],
+        description=embeds[embed_name]["description"],
+        color=discord.Color(int(embeds[embed_name]["color"].lstrip('#'), 16))
+    )
+    await ctx.send(f"'{embed_name}' adlı embed başarıyla oluşturuldu.", embed=embed)
 
 # Embed başlık ayarlama komutu
 @bot.command()
@@ -61,7 +80,14 @@ async def embed_title(ctx, embed_name, title):
     # Başlık değiştirilmiş oluyor
     embeds[embed_name]["title"] = title
     save_embeds(embeds)  # Değişiklikleri kaydediyoruz
-    await ctx.send(f"'{embed_name}' adlı embed'in başlığı '{title}' olarak değiştirildi.")
+    
+    # Embed'in önizlemesini gönderiyoruz
+    embed = discord.Embed(
+        title=embeds[embed_name]["title"],
+        description=embeds[embed_name]["description"],
+        color=discord.Color(int(embeds[embed_name]["color"].lstrip('#'), 16))
+    )
+    await ctx.send(f"'{embed_name}' adlı embed'in başlığı '{title}' olarak değiştirildi.", embed=embed)
 
 # Embed açıklama ayarlama komutu
 @bot.command()
@@ -76,7 +102,14 @@ async def embed_description(ctx, embed_name, description):
     # Açıklama değiştirilmiş oluyor
     embeds[embed_name]["description"] = description
     save_embeds(embeds)  # Değişiklikleri kaydediyoruz
-    await ctx.send(f"'{embed_name}' adlı embed'in açıklaması '{description}' olarak değiştirildi.")
+    
+    # Embed'in önizlemesini gönderiyoruz
+    embed = discord.Embed(
+        title=embeds[embed_name]["title"],
+        description=embeds[embed_name]["description"],
+        color=discord.Color(int(embeds[embed_name]["color"].lstrip('#'), 16))
+    )
+    await ctx.send(f"'{embed_name}' adlı embed'in açıklaması '{description}' olarak değiştirildi.", embed=embed)
 
 # Embed rengini değiştirme komutu (Hex formatında)
 @bot.command()
@@ -93,7 +126,14 @@ async def embed_color(ctx, embed_name, color_hex):
         color = discord.Color(int(color_hex.lstrip('#'), 16))  # Hex rengini alıyoruz
         embeds[embed_name]["color"] = color_hex  # Rengi kaydediyoruz
         save_embeds(embeds)  # Değişiklikleri kaydediyoruz
-        await ctx.send(f"'{embed_name}' adlı embed'in rengi '{color_hex}' olarak değiştirildi.")
+        
+        # Embed'in önizlemesini gönderiyoruz
+        embed = discord.Embed(
+            title=embeds[embed_name]["title"],
+            description=embeds[embed_name]["description"],
+            color=color
+        )
+        await ctx.send(f"'{embed_name}' adlı embed'in rengi '{color_hex}' olarak değiştirildi.", embed=embed)
     except ValueError:
         await ctx.send("Geçersiz renk kodu! Lütfen geçerli bir hex renk kodu girin (örneğin #ffffff).")
 
@@ -134,6 +174,7 @@ async def help(ctx):
     **!embed description <embed_ismi> <description>** - Embed açıklamasını değiştirir.
     **!embed color <embed_ismi> <hex_color>** - Embed rengini değiştirir (hex renk kodu ile).
     **!embed send <embed_ismi>** - Embed mesajını gönderir.
+    **!embed list** - Mevcut embed'leri listeler.
     
     **Not:** Yalnızca "Mesajları yönetme" yetkisine sahip kullanıcılar embed'leri oluşturabilir ve düzenleyebilir.
     """
