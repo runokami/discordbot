@@ -1,70 +1,160 @@
 import discord
 from discord.ext import commands
+from PIL import Image, ImageDraw, ImageFont
 import sqlite3
+import random
 import os
+import re
 
-# Token'ı güvenli bir şekilde almak için os modülünü kullanıyoruz
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = os.environ.get("DISCORD_TOKEN")
+PREFIX = "!"
+RANK_CARD_WIDTH = 930
+RANK_CARD_HEIGHT = 275
 
-# Intents nesnesini oluşturuyoruz
 intents = discord.Intents.default()
 intents.message_content = True
+bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+tree = discord.app_commands.CommandTree(bot)
 
-# Botu oluşturuyoruz
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# Veritabanı bağlantısı
-conn = sqlite3.connect('xp_database.db')
+conn = sqlite3.connect("bot.db")
 cursor = conn.cursor()
 
-# Kullanıcılar için tabloyu oluşturuyoruz
-cursor.execute('''
+cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL,
-    xp INTEGER NOT NULL DEFAULT 0
+    id TEXT PRIMARY KEY,
+    xp INTEGER,
+    level INTEGER,
+    rank TEXT,
+    avatar_path TEXT
 )
-''')
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS embeds (
+    ad TEXT PRIMARY KEY,
+    baslik TEXT,
+    aciklama TEXT,
+    renk INTEGER,
+    gorsel_url TEXT,
+    footer_metni TEXT,
+    olusturan TEXT
+)
+""")
+
 conn.commit()
+
+def load_users():
+    cursor.execute("SELECT * FROM users")
+    users = {row[0]: {"id": row[0], "xp": row[1], "level": row[2], "rank": row[3], "avatar_path": row[4]} for row in cursor.fetchall()}
+    return users
+
+def save_users(users):
+    cursor.execute("DELETE FROM users")
+    for user in users.values():
+        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", (user["id"], user["xp"], user["level"], user["rank"], user["avatar_path"]))
+    conn.commit()
+
+def load_embeds():
+    cursor.execute("SELECT * FROM embeds")
+    embeds = {row[0]: {"baslik": row[1], "aciklama": row[2], "renk": row[3], "gorsel_url": row[4], "footer_metni": row[5], "olusturan": row[6]} for row in cursor.fetchall()}
+    return embeds
+
+def save_embeds(embeds):
+    cursor.execute("DELETE FROM embeds")
+    for embed in embeds.values():
+        cursor.execute("INSERT INTO embeds VALUES (?, ?, ?, ?, ?, ?, ?)", (embed["ad"], embed["baslik"], embed["aciklama"], embed["renk"], embed["gorsel_url"], embed["footer_metni"], embed["olusturan"]))
+    conn.commit()
+
+def calculate_level_xp(level):
+    return 2 ** level * 100
+
+def generate_rank_card(user):
+    avatar = Image.open(user["avatar_path"]).resize((200, 200))
+
+    card = Image.new("RGB", (RANK_CARD_WIDTH, RANK_CARD_HEIGHT), (128, 128, 128))
+    inner_card = Image.new("RGB", (RANK_CARD_WIDTH - 5, RANK_CARD_HEIGHT - 5), (0, 0, 0))
+    card.paste(inner_card, (3, 3))
+
+    card.paste(avatar, (20, 35))
+
+    draw = ImageDraw.Draw(card)
+    font = ImageFont.truetype("arial.ttf", 40)
+    small_font = ImageFont.truetype("arial.ttf", 20)
+
+    draw.text((250, 50), f"Seviye: {user['level']}", (255, 255, 255), font=font)
+    draw.text((250, 150), f"Rank: {user['rank']}", (255, 255, 255), font=font)
+
+    xp_bar_width = 500
+    xp_bar_x = 250
+    xp_bar_y = 100
+
+    draw.rectangle((xp_bar_x, xp_bar_y, xp_bar_x + xp_bar_width, xp_bar_y + 20), outline=(255, 255, 255))
+    fill_width = int(xp_bar_width * (user["xp"] / calculate_level_xp(user["level"])))
+    draw.rectangle((xp_bar_x, xp_bar_y, xp_bar_x + fill_width, xp_bar_y + 20), fill=(0, 255, 0))
+
+    draw.text((xp_bar_x, xp_bar_y + 25), f"{user['xp']} / {calculate_level_xp(user['level'])}", (128, 128, 128), font=small_font)
+
+    card.save(f"rank_{user['id']}.png")
+    return f"rank_{user['id']}.png"
+
+def hex_to_int(hex_code):
+    hex_code = hex_code.lstrip("#")
+    return int(hex_code, 16)
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user} olarak giriş yapıldı!')
+    print(f"{bot.user} olarak giriş yaptık!")
+    await tree.sync()
+
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
+
+    users = load_users()
+    user_id = str(message.author.id)
+
+    if user_id not in users:
+        users[user_id] = {
+            "id": user_id,
+            "xp": 0,
+            "level": 0,
+            "rank": "Başlangıç",
+            "avatar_path": f"avatars/{user_id}.png"
+        }
+        await message.author.avatar.save(f"avatars/{user_id}.png")
+
+    xp_gained = random.choices([0, 5, 10, 15], weights=[0.5, 0.25, 0.15, 0.1])[0]
+    users[user_id]["xp"] += xp_gained
+
+    required_xp = calculate_level_xp(users[user_id]["level"])
+    if users[user_id]["xp"] >= required_xp:
+        users[user_id]["level"] += 1
+        users[user_id]["xp"] -= required_xp
+        await message.channel.send(f"{message.author.mention} seviye atladı! Yeni seviye: {users[user_id]['level']}")
+
+    save_users(users)
+    await bot.process_commands(message)
 
 @bot.command()
 async def rank(ctx):
-    """Kullanıcının XP bilgisini gösterir"""
     user_id = str(ctx.author.id)
-    
-    # Kullanıcıyı veritabanından çekiyoruz
-    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-    user = cursor.fetchone()
-    
-    if user:
-        xp = user[2]
-        await ctx.send(f'{ctx.author.name} XP: {xp}')
-    else:
-        await ctx.send(f'{ctx.author.name} XP: 0')
+    users = load_users()
+    if user_id not in users:
+        await ctx.send("Henüz bir rank kartınız yok. Mesaj göndererek XP kazanın.")
+        return
+
+    rank_card_file = generate_rank_card(users[user_id])
+    await ctx.send(file=discord.File(rank_card_file))
+    os.remove(rank_card_file)
 
 @bot.command()
-async def addxp(ctx, xp: int):
-    """Kullanıcıya XP ekler"""
-    user_id = str(ctx.author.id)
-    
-    # Kullanıcıyı veritabanından çekiyoruz
-    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-    user = cursor.fetchone()
-    
-    if user:
-        # Kullanıcının XP'sini güncelliyoruz
-        new_xp = user[2] + xp
-        cursor.execute('UPDATE users SET xp = ? WHERE user_id = ?', (new_xp, user_id))
-    else:
-        # Yeni kullanıcı ekliyoruz
-        cursor.execute('INSERT INTO users (user_id, xp) VALUES (?, ?)', (user_id, xp))
-    
-    conn.commit()
-    await ctx.send(f'{xp} XP {ctx.author.name}\'a eklendi!')
+async def prefix(ctx, new_prefix):
+    global PREFIX
+    PREFIX = new_prefix
+    bot.command_prefix = new_prefix
+    await ctx.send(f"Önek `{new_prefix}` olarak değiştirildi.")
 
-# Botu çalıştırıyoruz
-bot.run(TOKEN)
+@bot.command()
+async def embed_oluştur(ctx, ad: str, başlık: str, açıklama: str, renk: str = "#00FF00", görsel_url: str = None, footer_metni: str = None):
+    if not re.match(r'^#([0-9A-Fa-f]{6})$', renk):
