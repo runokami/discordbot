@@ -4,3 +4,4 @@ JSON
 random
 os
 re
+sqlite3
