@@ -14,7 +14,7 @@ def hex_to_int(hex_code):
     hex_code = hex_code.lstrip("#")
     return int(hex_code, 16)
 
-@bot.command(name="embed_create")
+@bot.command(name="embed create")
 async def embed_create(ctx, başlık: str, açıklama: str, renk: str = "#00FF00", görsel_url: str = None, footer_metni: str = None):
     if not re.match(r'^#([0-9A-Fa-f]{6})$', renk):
         await ctx.send("Geçersiz renk kodu. #ffffff formatında bir hex renk kodu girin.")
