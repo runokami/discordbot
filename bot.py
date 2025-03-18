@@ -1,47 +1,52 @@
 import discord
 from discord.ext import commands
+import json
 import os
+import random
 
-TOKEN = os.getenv("DISCORD_TOKEN")  # Token'ı güvenli şekilde alıyoruz
+TOKEN = os.getenv("DISCORD_TOKEN")  
+EMBED_FILE = "embeds.json"  # Embedlerin kaydedildiği dosya
+XP_FILE = "xp.json"  # XP sisteminin kaydedildiği dosya
 
-intents = discord.Intents.all()  # Tüm intentsleri açıyoruz
-bot = commands.Bot(command_prefix="!", intents=intents)  # Prefix olarak "!" belirliyoruz
-
-@bot.event
-async def on_ready():
-    print(f"{bot.user} olarak giriş yapıldı!")
-
-@bot.command()
-async def ping(ctx):
-    await ctx.send("Pong!")  # Kullanıcı !ping yazarsa bot Pong! yanıtı verecek
-
-# JSON dosyasını yükleme
-def load_embeds():
-    if not os.path.exists(EMBED_FILE):
-        return {}
-    with open(EMBED_FILE, "r", encoding="utf-8") as f:
+# 📂 JSON Dosya Yönetimi
+def load_json(filename):
+    if not os.path.exists(filename):
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump({}, f)  # Eğer dosya yoksa boş bir JSON oluştur
+    with open(filename, "r", encoding="utf-8") as f:
         return json.load(f)
 
-# JSON dosyasını kaydetme
-def save_embeds(embeds):
-    with open(EMBED_FILE, "w", encoding="utf-8") as f:
-        json.dump(embeds, f, indent=4, ensure_ascii=False)
+def save_json(filename, data):
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
-# Embed verisini sunucuya özel al
+# 📥 EMBED SİSTEMİ
 def get_guild_embeds(guild_id):
-    embeds = load_embeds()
+    embeds = load_json(EMBED_FILE)
     if str(guild_id) not in embeds:
-        embeds[str(guild_id)] = {"embeds": {}}
-        save_embeds(embeds)
-    return embeds[str(guild_id)]["embeds"]
+        embeds[str(guild_id)] = {}
+        save_json(EMBED_FILE, embeds)
+    return embeds[str(guild_id)]
 
-# Embed verisini sunucuya özel kaydet
-def save_guild_embeds(guild_id, embeds_data):
-    embeds = load_embeds()
-    embeds[str(guild_id)] = {"embeds": embeds_data}
-    save_embeds(embeds)
+def save_guild_embeds(guild_id, data):
+    embeds = load_json(EMBED_FILE)
+    embeds[str(guild_id)] = data
+    save_json(EMBED_FILE, embeds)
 
-# Botu oluştur
+# 📥 XP SİSTEMİ
+def get_guild_xp(guild_id):
+    xp_data = load_json(XP_FILE)
+    if str(guild_id) not in xp_data:
+        xp_data[str(guild_id)] = {}
+        save_json(XP_FILE, xp_data)
+    return xp_data[str(guild_id)]
+
+def save_guild_xp(guild_id, data):
+    xp_data = load_json(XP_FILE)
+    xp_data[str(guild_id)] = data
+    save_json(XP_FILE, xp_data)
+
+# 🤖 Botu oluştur
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -49,112 +54,84 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"{bot.user} olarak giriş yapıldı!")
 
-# Embed oluşturma komutu
+# 📌 **!help → Özel Yardım Komutu**
 @bot.command()
-@commands.has_permissions(manage_messages=True)
-async def embed_create(ctx, embed_name):
+async def help(ctx):
+    embed = discord.Embed(title="📜 Komut Listesi", color=0x3498db)
+    embed.add_field(name="!ping", value="Pong! Botun çalışıp çalışmadığını kontrol eder.", inline=False)
+    embed.add_field(name="!embed create <isim>", value="Yeni bir embed oluşturur.", inline=False)
+    embed.add_field(name="!embed title <isim> <başlık>", value="Embed başlığını ayarlar.", inline=False)
+    embed.add_field(name="!embed description <isim> <açıklama>", value="Embed açıklamasını ayarlar.", inline=False)
+    embed.add_field(name="!embed color <isim> <#hex>", value="Embed rengini ayarlar.", inline=False)
+    embed.add_field(name="!embed image <isim> <URL>", value="Embed görselini ayarlar.", inline=False)
+    embed.add_field(name="!embed send <isim>", value="Embed'i kanala gönderir.", inline=False)
+    embed.add_field(name="!embed list", value="Sunucudaki tüm embedleri listeler.", inline=False)
+    embed.add_field(name="!rank", value="XP sisteminden seviyenizi gösterir.", inline=False)
+    await ctx.send(embed=embed)
+
+# 📌 **!embed list → Sunucudaki Tüm Embedleri Listeleme**
+@bot.command()
+async def embed_list(ctx):
     guild_id = ctx.guild.id
     embeds = get_guild_embeds(guild_id)
 
-    if embed_name in embeds:
-        await ctx.send(f"❌ **{embed_name}** adlı embed zaten var!")
-        return
-    
-    embeds[embed_name] = {"title": "", "description": "", "color": "#FFFFFF", "image": ""}
-    save_guild_embeds(guild_id, embeds)
-
-    await ctx.send(f"✅ **{embed_name}** adlı embed oluşturuldu!")
-
-# Embed başlık ayarlama komutu
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def embed_title(ctx, embed_name, *, title):
-    guild_id = ctx.guild.id
-    embeds = get_guild_embeds(guild_id)
-
-    if embed_name not in embeds:
-        await ctx.send(f"❌ **{embed_name}** adlı embed bulunamadı!")
-        return
-    
-    embeds[embed_name]["title"] = title
-    save_guild_embeds(guild_id, embeds)
-
-    await ctx.send(f"✅ **{embed_name}** başlığı **{title}** olarak ayarlandı!")
-
-# Embed açıklama ayarlama komutu
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def embed_description(ctx, embed_name, *, description):
-    guild_id = ctx.guild.id
-    embeds = get_guild_embeds(guild_id)
-
-    if embed_name not in embeds:
-        await ctx.send(f"❌ **{embed_name}** adlı embed bulunamadı!")
-        return
-    
-    embeds[embed_name]["description"] = description
-    save_guild_embeds(guild_id, embeds)
-
-    await ctx.send(f"✅ **{embed_name}** açıklaması ayarlandı!")
-
-# Embed rengini ayarlama komutu
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def embed_color(ctx, embed_name, color: str):
-    guild_id = ctx.guild.id
-    embeds = get_guild_embeds(guild_id)
-
-    if embed_name not in embeds:
-        await ctx.send(f"❌ **{embed_name}** adlı embed bulunamadı!")
-        return
-    
-    if not color.startswith("#") or len(color) != 7:
-        await ctx.send("❌ **Hex renk kodu hatalı!** Örnek: `#ff0000`")
+    if not embeds:
+        await ctx.send("📭 **Bu sunucu için hiç embed oluşturulmamış!**")
         return
 
-    embeds[embed_name]["color"] = color
-    save_guild_embeds(guild_id, embeds)
-
-    await ctx.send(f"✅ **{embed_name}** rengi **{color}** olarak ayarlandı!")
-
-# Embed görsel ekleme komutu
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def embed_image(ctx, embed_name, image_url: str):
-    guild_id = ctx.guild.id
-    embeds = get_guild_embeds(guild_id)
-
-    if embed_name not in embeds:
-        await ctx.send(f"❌ **{embed_name}** adlı embed bulunamadı!")
-        return
-    
-    embeds[embed_name]["image"] = image_url
-    save_guild_embeds(guild_id, embeds)
-
-    await ctx.send(f"✅ **{embed_name}** için görsel ayarlandı!")
-
-# Embed gönderme komutu
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def embed_send(ctx, embed_name):
-    guild_id = ctx.guild.id
-    embeds = get_guild_embeds(guild_id)
-
-    if embed_name not in embeds:
-        await ctx.send(f"❌ **{embed_name}** adlı embed bulunamadı!")
-        return
-    
-    data = embeds[embed_name]
-
-    embed = discord.Embed(
-        title=data["title"],
-        description=data["description"],
-        color=int(data["color"][1:], 16)  # HEX renk kodunu sayıya çeviriyoruz
-    )
-
-    if data["image"]:
-        embed.set_image(url=data["image"])
+    embed = discord.Embed(title="📜 Embed Listesi", color=0x00FF00)
+    for embed_name in embeds.keys():
+        embed.add_field(name=embed_name, value="Ayarlandı ✅", inline=False)
 
     await ctx.send(embed=embed)
 
+# 📌 **XP SİSTEMİ (Seviye ve Rank)**
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return  # Bot mesajlarını yok say
+
+    guild_id = message.guild.id
+    user_id = str(message.author.id)
+    xp_data = get_guild_xp(guild_id)
+
+    if user_id not in xp_data:
+        xp_data[user_id] = {"xp": 0, "level": 1}
+
+    xp_data[user_id]["xp"] += random.randint(5, 15)  # 5-15 XP rastgele ekle
+    current_xp = xp_data[user_id]["xp"]
+    level = xp_data[user_id]["level"]
+
+    # 🆙 Seviye Atlatma Sistemi
+    if current_xp >= level * 100:  # Örneğin, 1. seviyeden 2. seviyeye 100 XP gerekir.
+        xp_data[user_id]["xp"] = 0
+        xp_data[user_id]["level"] += 1
+        await message.channel.send(f"🎉 {message.author.mention} **{level+1}. seviyeye ulaştı!**")
+
+    save_guild_xp(guild_id, xp_data)
+
+    await bot.process_commands(message)
+
+# 📌 **!rank → Kullanıcının XP ve Seviyesini Göster**
+@bot.command()
+async def rank(ctx, member: discord.Member = None):
+    member = member or ctx.author  # Eğer kullanıcı birisini etiketlemezse kendisini alır
+    guild_id = ctx.guild.id
+    user_id = str(member.id)
+    xp_data = get_guild_xp(guild_id)
+
+    if user_id not in xp_data:
+        await ctx.send(f"❌ {member.mention} için herhangi bir XP verisi bulunamadı!")
+        return
+
+    xp = xp_data[user_id]["xp"]
+    level = xp_data[user_id]["level"]
+
+    embed = discord.Embed(title=f"{member.name} - Rank", color=0xFFD700)
+    embed.add_field(name="Seviye", value=level, inline=True)
+    embed.add_field(name="XP", value=f"{xp}/{level*100}", inline=True)
+
+    await ctx.send(embed=embed)
+
+# 🚀 **Botu Başlat**
 bot.run(TOKEN)
