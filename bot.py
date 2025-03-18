@@ -1,11 +1,12 @@
 import discord
 import json
 import os
+import re
 
-TOKEN = os.environ.get("DISCORD_TOKEN") # GitHub Actions'tan token al
+TOKEN = os.environ.get("DISCORD_TOKEN")
 intents = discord.Intents.default()
-intents.message_content = True
 client = discord.Client(intents=intents)
+tree = discord.app_commands.CommandTree(client)
 
 EMBEDS_FILE = "embeds.json"
 
@@ -20,66 +21,88 @@ def save_embeds(embeds):
     with open(EMBEDS_FILE, "w") as f:
         json.dump(embeds, f, indent=4)
 
+def hex_to_int(hex_code):
+    hex_code = hex_code.lstrip("#")
+    return int(hex_code, 16)
+
 @client.event
 async def on_ready():
     print(f"{client.user} olarak giriş yaptık!")
+    await tree.sync()
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
+@tree.command(name="embed_oluştur", description="Yeni bir embed oluşturur.")
+async def create_embed(interaction: discord.Interaction, ad: str, başlık: str, açıklama: str, renk: str = "#00FF00", görsel_url: str = None, footer_metni: str = None):
+    if not re.match(r'^#([0-9A-Fa-f]{6})$', renk):
+        await interaction.response.send_message("Geçersiz renk kodu. #ffffff formatında bir hex renk kodu girin.", ephemeral=True)
         return
 
-    if message.content.startswith("!embed create"):
-        parts = message.content.split(" ")
-        if len(parts) < 3:
-            await message.channel.send("Kullanım: !embed create <ad> [renk]")
-            return
+    color = hex_to_int(renk)
+    embeds = load_embeds()
+    embeds[ad] = {
+        "başlık": başlık,
+        "açıklama": açıklama,
+        "renk": color,
+        "görsel_url": görsel_url,
+        "footer_metni": footer_metni,
+        "oluşturan": interaction.user.id
+    }
+    save_embeds(embeds)
+    await interaction.response.send_message(f"'{ad}' adında embed oluşturuldu.")
 
-        embed_name = parts[2]
-        color = 0x00FF00  # Varsayılan renk (yeşil)
-        if len(parts) > 3:
-            try:
-                color = int(parts[3], 16)
-            except ValueError:
-                await message.channel.send("Geçersiz renk kodu. Hex renk kodu girin (örneğin, 0xFF0000).")
-                return
+@tree.command(name="embed_listele", description="Kayıtlı embedleri listeler.")
+async def list_embeds(interaction: discord.Interaction):
+    embeds = load_embeds()
+    if not embeds:
+        await interaction.response.send_message("Kayıtlı embed yok.", ephemeral=True)
+        return
 
-        embeds = load_embeds()
-        embeds[embed_name] = {"color": color}
-        save_embeds(embeds)
-        await message.channel.send(f"'{embed_name}' adında embed oluşturuldu. Renk: {hex(color)}")
+    embed_list = "\n".join(f"- {name}: {data['başlık']}" for name, data in embeds.items())
+    await interaction.response.send_message(f"Kayıtlı Embedler:\n{embed_list}")
 
-    elif message.content.startswith("!embed list"):
-        embeds = load_embeds()
-        if not embeds:
-            await message.channel.send("Kayıtlı embed yok.")
-            return
+@tree.command(name="gönder", description="Belirtilen embedi gönderir.")
+async def send_embed(interaction: discord.Interaction, ad: str):
+    embeds = load_embeds()
+    if ad not in embeds:
+        await interaction.response.send_message("Embed bulunamadı.", ephemeral=True)
+        return
 
-        embed_list = "\n".join(f"- {name}: {hex(data['color'])}" for name, data in embeds.items())
-        await message.channel.send(f"Kayıtlı Embedler:\n{embed_list}")
+    embed_data = embeds[ad]
+    embed = discord.Embed(title=embed_data["başlık"], description=embed_data["açıklama"], color=embed_data["renk"])
+    if embed_data.get("görsel_url"):
+        embed.set_image(url=embed_data["görsel_url"])
+    if embed_data.get("footer_metni"):
+        embed.set_footer(text=embed_data["footer_metni"], icon_url=interaction.user.avatar.url)
+    oluşturan = await client.fetch_user(embed_data["oluşturan"])
+    embed.set_author(name=oluşturan.name, icon_url=oluşturan.avatar.url)
 
-    elif message.content.startswith("!gönder"):
-        parts = message.content.split(" ")
-        if len(parts) < 2:
-            await message.channel.send("Kullanım: !gönder <ad>")
-            return
-        embed_name = parts[1]
-        embeds = load_embeds()
-        if embed_name not in embeds:
-            await message.channel.send("Embed bulunamadı.")
-            return
-        embed_data = embeds[embed_name]
-        embed = discord.Embed(title=embed_name, color=embed_data["color"])
-        await message.channel.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
-    elif message.content.startswith("!help"):
-        help_message = """
-        Komutlar:
-        - !embed create <ad> [renk]: Yeni bir embed oluşturur.
-        - !embed list: Kayıtlı embedleri listeler.
-        - !gönder <ad>: Belirtilen embedi gönderir.
-        - !help: Bu yardım mesajını gösterir.
-        """
-        await message.channel.send(help_message)
+@tree.command(name="embed_renk_değiştir", description="Bir embedin rengini değiştirir.")
+async def change_embed_color(interaction: discord.Interaction, ad: str, yeni_renk: str):
+    if not re.match(r'^#([0-9A-Fa-f]{6})$', yeni_renk):
+        await interaction.response.send_message("Geçersiz renk kodu. #ffffff formatında bir hex renk kodu girin.", ephemeral=True)
+        return
+
+    embeds = load_embeds()
+    if ad not in embeds:
+        await interaction.response.send_message("Embed bulunamadı.", ephemeral=True)
+        return
+
+    color = hex_to_int(yeni_renk)
+    embeds[ad]["renk"] = color
+    save_embeds(embeds)
+    await interaction.response.send_message(f"'{ad}' embedinin rengi {yeni_renk} olarak değiştirildi.")
+
+@tree.command(name="yardım", description="Komutları gösterir.")
+async def help_command(interaction: discord.Interaction):
+    help_message = """
+    Komutlar:
+    - /embed_oluştur <ad> <başlık> <açıklama> [renk] [görsel_url] [footer_metni]: Yeni bir embed oluşturur.
+    - /embed_listele: Kayıtlı embedleri listeler.
+    - /gönder <ad>: Belirtilen embedi gönderir.
+    - /embed_renk_değiştir <ad> <yeni_renk>: Bir embedin rengini değiştirir.
+    - /yardım: Bu yardım mesajını gösterir.
+    """
+    await interaction.response.send_message(help_message)
 
 client.run(TOKEN)
