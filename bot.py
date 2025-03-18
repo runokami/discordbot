@@ -11,5 +11,5 @@ client = discord.Client()
 async def on_ready():
     print(f'{client.user} olarak giriş yapıldı!')
 
-# Botu çalıştırmak için token kullanıyoruz
+# Botu çalıştırmak için token kullanıyoruz.
 client.run(TOKEN)
