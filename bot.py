@@ -15,5 +15,13 @@ client = discord.Client(intents=intents)
 async def on_ready():
     print(f'{client.user} olarak giriş yapıldı!')
 
+# Botu oluşturuyoruz ve prefix olarak "!" belirliyoruz
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Ping komutunu tanımlıyoruz
+@bot.command()
+async def ping(ctx):
+    await ctx.send("Pong!")
+
 # Botu çalıştırmak için token kullanıyoruz
 client.run(TOKEN)
