@@ -1,74 +1,85 @@
 import discord
-from discord.ext import commands
-import os
 import json
+import os
 
-# Botun token'ı
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = os.environ.get("DISCORD_TOKEN") # GitHub Actions'tan token al
+intents = discord.Intents.default()
+intents.message_content = True
+client = discord.Client(intents=intents)
 
-# Intents nesnesini oluşturuyoruz
-intents = discord.Intents.all()
+EMBEDS_FILE = "embeds.json"
 
-# Botu oluşturuyoruz
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
-
-# Ping komutunu tanımlıyoruz
-@bot.command()
-async def ping(ctx):
-    await ctx.send("Pong!")
-
-# Embed gönderme komutunu tanımlıyoruz
-@bot.command()
-async def embed(ctx):
-    embed = discord.Embed(
-        title="Başlık Buraya",
-        description="Açıklama Buraya",
-        color=discord.Color.blue()  # Embed rengini mavi yapıyoruz
-    )
-    await ctx.send(embed=embed)
-
-# Embed'leri saklamak için JSON dosyasının yolu
-EMBEDS_FILE = 'embeds.json'
-
-# Embed'leri dosyadan yüklemek için fonksiyon
 def load_embeds():
-    if not os.path.exists(EMBEDS_FILE):
+    try:
+        with open(EMBEDS_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
         return {}
-    with open(EMBEDS_FILE, 'r') as file:
-        return json.load(file)
 
-# Embed'leri dosyaya kaydetmek için fonksiyon
 def save_embeds(embeds):
-    with open(EMBEDS_FILE, 'w') as file:
-        json.dump(embeds, file, indent=4)
+    with open(EMBEDS_FILE, "w") as f:
+        json.dump(embeds, f, indent=4)
 
-# Embed oluşturma komutu
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def embed_create(ctx, embed_name):
-    embeds = load_embeds()
-    
-    if embed_name in embeds:
-        await ctx.send(f"'{embed_name}' adlı bir embed zaten mevcut.")
+@client.event
+async def on_ready():
+    print(f"{client.user} olarak giriş yaptık!")
+
+@client.event
+async def on_message(message):
+    if message.author == client.user:
         return
 
-    # Yeni embed nesnesi oluşturuluyor
-    embeds[embed_name] = {
-        "title": "Başlık Buraya", 
-        "description": "Açıklama Buraya", 
-        "color": "#0000FF"  # Varsayılan renk mavi (hex formatında)
-    }
+    if message.content.startswith("!embed create"):
+        parts = message.content.split(" ")
+        if len(parts) < 3:
+            await message.channel.send("Kullanım: !embed create <ad> [renk]")
+            return
 
-    # Embed'leri kaydediyoruz
-    save_embeds(embeds)
-    
-    # Embed'in önizlemesini gönderiyoruz
-    embed = discord.Embed(
-        title=embeds[embed_name]["title"],
-        description=embeds[embed_name]["description"],
-        color=discord.Color(int(embeds[embed_name]["color"].lstrip('#'), 16))
-    )
-    await ctx.send(f"'{embed_name}' adlı embed başarıyla oluşturuldu.", embed=embed)
+        embed_name = parts[2]
+        color = 0x00FF00  # Varsayılan renk (yeşil)
+        if len(parts) > 3:
+            try:
+                color = int(parts[3], 16)
+            except ValueError:
+                await message.channel.send("Geçersiz renk kodu. Hex renk kodu girin (örneğin, 0xFF0000).")
+                return
 
-# Botu başlatıyoruz
-bot.run(TOKEN)
+        embeds = load_embeds()
+        embeds[embed_name] = {"color": color}
+        save_embeds(embeds)
+        await message.channel.send(f"'{embed_name}' adında embed oluşturuldu. Renk: {hex(color)}")
+
+    elif message.content.startswith("!embed list"):
+        embeds = load_embeds()
+        if not embeds:
+            await message.channel.send("Kayıtlı embed yok.")
+            return
+
+        embed_list = "\n".join(f"- {name}: {hex(data['color'])}" for name, data in embeds.items())
+        await message.channel.send(f"Kayıtlı Embedler:\n{embed_list}")
+
+    elif message.content.startswith("!gönder"):
+        parts = message.content.split(" ")
+        if len(parts) < 2:
+            await message.channel.send("Kullanım: !gönder <ad>")
+            return
+        embed_name = parts[1]
+        embeds = load_embeds()
+        if embed_name not in embeds:
+            await message.channel.send("Embed bulunamadı.")
+            return
+        embed_data = embeds[embed_name]
+        embed = discord.Embed(title=embed_name, color=embed_data["color"])
+        await message.channel.send(embed=embed)
+
+    elif message.content.startswith("!help"):
+        help_message = """
+        Komutlar:
+        - !embed create <ad> [renk]: Yeni bir embed oluşturur.
+        - !embed list: Kayıtlı embedleri listeler.
+        - !gönder <ad>: Belirtilen embedi gönderir.
+        - !help: Bu yardım mesajını gösterir.
+        """
+        await message.channel.send(help_message)
+
+client.run(TOKEN)
