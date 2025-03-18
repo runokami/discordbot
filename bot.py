@@ -10,7 +10,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.all()
 
 # Botu oluşturuyoruz
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)  # help_command=None ile varsayılan help komutunu devre dışı bırakıyoruz
 
 # Embed'leri saklamak için JSON dosyasının yolu
 EMBEDS_FILE = 'embeds/embeds.json'
@@ -29,7 +29,7 @@ def save_embeds(embeds):
 
 # Embed oluşturma komutu
 @bot.command()
-@commands.has_permissions(manage_messages=True)  # "Mesajları yönetme" yetkisini ekledik
+@commands.has_permissions(manage_messages=True)
 async def embed_create(ctx, embed_name):
     embeds = load_embeds()
     
@@ -50,7 +50,7 @@ async def embed_create(ctx, embed_name):
 
 # Embed başlık ayarlama komutu
 @bot.command()
-@commands.has_permissions(manage_messages=True)  # "Mesajları yönetme" yetkisini ekledik
+@commands.has_permissions(manage_messages=True)
 async def embed_title(ctx, embed_name, title):
     embeds = load_embeds()
     
@@ -65,7 +65,7 @@ async def embed_title(ctx, embed_name, title):
 
 # Embed açıklama ayarlama komutu
 @bot.command()
-@commands.has_permissions(manage_messages=True)  # "Mesajları yönetme" yetkisini ekledik
+@commands.has_permissions(manage_messages=True)
 async def embed_description(ctx, embed_name, description):
     embeds = load_embeds()
     
@@ -80,7 +80,7 @@ async def embed_description(ctx, embed_name, description):
 
 # Embed rengini değiştirme komutu (Hex formatında)
 @bot.command()
-@commands.has_permissions(manage_messages=True)  # "Mesajları yönetme" yetkisini ekledik
+@commands.has_permissions(manage_messages=True)
 async def embed_color(ctx, embed_name, color_hex):
     embeds = load_embeds()
 
