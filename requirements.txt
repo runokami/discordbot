@@ -1,6 +1,2 @@
 discord.py
 Pillow
-random
-os
-re
-sqlite3
