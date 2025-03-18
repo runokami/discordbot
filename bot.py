@@ -48,7 +48,7 @@ def save_guild_xp(guild_id, data):
 
 # 🤖 Botu oluştur
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)  # help_command=None ile varsayılan yardımı devre dışı bırakıyoruz
 
 @bot.event
 async def on_ready():
