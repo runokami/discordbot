@@ -93,12 +93,16 @@ def create_rank_image(user, rank, level, current_xp, required_xp):
 
     draw = ImageDraw.Draw(image)
 
-    # Yazı tipi ve boyutunu ayarlama (varsayılan yazı tipi)
-    font = ImageFont.load_default()
+    # Yazı tipi ve boyutunu ayarlama (arial.ttf yazı tipi)
+    font = ImageFont.truetype("arial.ttf", 30)
 
     # Kullanıcı avatarını ekleme
     avatar = get_user_avatar(user)
-    image.paste(avatar, (20, 50))
+    image.paste(avatar, (20, 20), avatar)
+
+    # Aktiflik durumunu gösteren yuvarlak çizme
+    status_color = get_user_status_color(user)
+    draw.ellipse((90, 90, 110, 110), fill=status_color)
 
     # Kullanıcı adını ekleme
     draw.text((140, 20), f"{user.name}", font=font, fill=(255, 255, 255))
@@ -187,22 +191,7 @@ async def on_message(message):
 @bot.command()
 async def rank(ctx, user: discord.Member = None):
     if user is None:
-        user = ctx.author
-
-    guild_id = str(ctx.guild.id)
-    user_id = str(user.id)
-
-    rank_data = get_user_rank(guild_id, user_id)
-
-    if rank_data is None:
-        await ctx.send("Bu kullanıcı için veri bulunamadı.")
-        return
-
-    rank, user_xp = rank_data
-    level, current_xp, required_xp = calculate_level(user_xp)
-
-    image_bytes = create_rank_image(user, rank, level, current_xp, required_xp)
-    await ctx.send(file=discord.File(image_bytes, "rank.png"))
+        user = ctx
 
 # Bot hazır olduğunda çalışacak kod
 @bot.event
