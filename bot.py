@@ -1,9 +1,10 @@
 import discord
 from discord.ext import commands
+import json
 from PIL import Image, ImageDraw, ImageFont
 import io
-import random
-import json
+import requests
+from io import BytesIO
 import os
 
 # Ortam değişkeninden bot token'ını al
@@ -20,23 +21,84 @@ if not os.path.exists("xp.json"):
     with open("xp.json", "w") as f:
         json.dump({}, f)
 
-def create_rank_image(user, rank, xp):
+# Kullanıcı avatarını indirme ve yeniden boyutlandırma
+def get_user_avatar(user):
+    avatar_url = user.avatar.url
+    response = requests.get(avatar_url)
+    avatar = Image.open(BytesIO(response.content)).resize((100, 100))
+    return avatar
+
+# Kullanıcının seviyesini ve XP ilerlemesini hesaplama
+def calculate_level(xp):
+    level = 0
+    required_xp = 100
+    while xp >= required_xp:
+        level += 1
+        xp -= required_xp
+        required_xp += 50
+    return level, xp, required_xp
+
+# Kullanıcının sıralamasını ve XP'sini alma
+def get_user_rank(guild_id, user_id):
+    with open("xp.json", "r") as f:
+        data = json.load(f)
+
+    if guild_id not in data:
+        return None
+
+    users = data[guild_id]
+
+    if str(user_id) not in users:
+        return None
+
+    user_xp = users[str(user_id)]
+
+    sorted_users = sorted(users.items(), key=lambda x: x[1], reverse=True)
+
+    rank = 0
+    for i, (uid, xp) in enumerate(sorted_users):
+        if str(uid) == str(user_id):
+            rank = i + 1
+            break
+
+    return rank, user_xp
+
+# Görsel oluşturma
+def create_rank_image(user, rank, level, current_xp, required_xp):
     # Arka plan resmi oluşturma veya yükleme
-    image = Image.new("RGB", (600, 200), color=(54, 57, 63))  # Discord'un koyu temasına uygun renk
+    image = Image.new("RGB", (800, 250), color=(54, 57, 63))  # Discord'un koyu temasına uygun renk
 
     draw = ImageDraw.Draw(image)
 
     # Yazı tipi ve boyutunu ayarlama (varsayılan yazı tipi)
     font = ImageFont.load_default()
 
+    # Kullanıcı avatarını ekleme
+    avatar = get_user_avatar(user)
+    image.paste(avatar, (20, 20))
+
     # Kullanıcı adını ekleme
-    draw.text((20, 20), f"Kullanıcı: {user.name}", font=font, fill=(255, 255, 255))
+    draw.text((140, 20), f"{user.name}", font=font, fill=(255, 255, 255))
 
-    # Sıralamayı ekleme
-    draw.text((20, 80), f"Sıralama: {rank}", font=font, fill=(255, 255, 255))
+    # Sıralama ve seviyeyi ekleme
+    draw.text((400, 20), f"RÜTBE #{rank} SEVİYE {level}", font=font, fill=(255, 255, 255))
 
-    # XP'yi ekleme
-    draw.text((20, 140), f"XP: {xp}", font=font, fill=(255, 255, 255))
+    # XP bilgisini ekleme
+    draw.text((600, 20), f"{current_xp} / {required_xp} XP", font=font, fill=(255, 255, 255))
+
+    # İlerleme çubuğu oluşturma
+    progress_bar_width = 600
+    progress_bar_height = 30
+    progress_bar_x = 140
+    progress_bar_y = 100
+
+    draw.rectangle((progress_bar_x, progress_bar_y, progress_bar_x + progress_bar_width, progress_bar_y + progress_bar_height), fill=(88, 101, 242))
+
+    # İlerleme miktarını hesaplama
+    progress_percentage = current_xp / required_xp
+    progress_width = int(progress_bar_width * progress_percentage)
+
+    draw.rectangle((progress_bar_x, progress_bar_y, progress_bar_x + progress_width, progress_bar_y + progress_bar_height), fill=(158, 135, 255))
 
     # Resmi bellekte saklama
     image_bytes = io.BytesIO()
@@ -44,42 +106,6 @@ def create_rank_image(user, rank, xp):
     image_bytes.seek(0)
 
     return image_bytes
-
-@bot.command()
-async def rank(ctx, user: discord.Member = None):
-    if user is None:
-        user = ctx.author
-
-    guild_id = str(ctx.guild.id)
-
-    with open("xp.json", "r") as f:
-        data = json.load(f)
-
-    if guild_id not in data:
-        await ctx.send("Bu sunucuda henüz XP verisi yok.")
-        return
-
-    users = data[guild_id]
-
-    if str(user.id) not in users:
-        await ctx.send("Bu kullanıcının henüz XP'si yok.")
-        return
-
-    user_xp = users[str(user.id)]
-
-    sorted_users = sorted(users.items(), key=lambda x: x[1], reverse=True)
-
-    rank = 0
-    for i, (user_id, xp) in enumerate(sorted_users):
-        if str(user.id) == str(user.id):
-            rank = i + 1
-            break
-
-    # Görseli oluşturma
-    image_bytes = create_rank_image(user, rank, user_xp)
-
-    # Görseli gönderme
-    await ctx.send(file=discord.File(image_bytes, "rank.png"))
 
 # XP ekleme fonksiyonu
 def add_xp(guild_id, user_id, xp):
@@ -126,16 +152,34 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    # guild_id, mesajın gönderildiği sunucunun ID'sidir
     guild_id = message.guild.id
-
-    # user_id, mesajı gönderen kullanıcının ID'sidir
     user_id = message.author.id
 
     xp = distribute_random_xp(guild_id, user_id)
     print(f"{message.guild.name} sunucusunda {message.author.name} kullanıcısına {xp} XP eklendi.")
 
     await bot.process_commands(message) # Komutları işle
+
+# rank komutu
+@bot.command()
+async def rank(ctx, user: discord.Member = None):
+    if user is None:
+        user = ctx.author
+
+    guild_id = str(ctx.guild.id)
+    user_id = str(user.id)
+
+    rank_data = get_user_rank(guild_id, user_id)
+
+    if rank_data is None:
+        await ctx.send("Bu kullanıcı için veri bulunamadı.")
+        return
+
+    rank, user_xp = rank_data
+    level, current_xp, required_xp = calculate_level(user_xp)
+
+    image_bytes = create_rank_image(user, rank, level, current_xp, required_xp)
+    await ctx.send(file=discord.File(image_bytes, "rank.png"))
 
 # Bot hazır olduğunda çalışacak kod
 @bot.event
