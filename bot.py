@@ -17,9 +17,13 @@ intents = discord.Intents.all()
 # Bot nesnesini oluştur
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Veri dosyasını oluştur (gerekirse)
+# Veri dosyalarını oluştur (gerekirse)
 if not os.path.exists("xp.json"):
     with open("xp.json", "w") as f:
+        json.dump({}, f)
+
+if not os.path.exists("arkaplanlar.json"):
+    with open("arkaplanlar.json", "w") as f:
         json.dump({}, f)
 
 # Kullanıcı avatarını indirme ve yuvarlak hale getirme
@@ -86,50 +90,57 @@ def get_user_rank(guild_id, user_id):
 
     return rank, user_xp
 
-# Görsel oluşturma
 def create_rank_image(user, rank, level, current_xp, required_xp):
-    # Arka plan resmi oluşturma veya yükleme
-    image = Image.new("RGB", (800, 250), color=(54, 57, 63))  # Discord'un koyu temasına uygun renk
+    # Arka plan resmi (kullanıcıya özel veya varsayılan)
+    with open("arkaplanlar.json", "r") as f:
+        arkaplanlar = json.load(f)
 
-    draw = ImageDraw.Draw(image)
+    arkaplan_url = arkaplanlar.get(str(user.id))
 
-    # Yazı tipi ve boyutunu ayarlama (arial.ttf yazı tipi)
-    font = ImageFont.truetype("arial.ttf", 30)
+    if arkaplan_url:
+        try:
+            response = requests.get(arkaplan_url)
+            response.raise_for_status()  # Hata durumlarını kontrol et
+            arkaplan = Image.open(BytesIO(response.content)).resize((800, 250))
+        except requests.exceptions.RequestException as e:
+            print(f"Arka plan yükleme hatası: {e}")
+            arkaplan = Image.new("RGB", (800, 250), color=(54, 57, 63))  # Varsayılan arka plan
+    else:
+        arkaplan = Image.new("RGB", (800, 250), color=(54, 57, 63))  # Varsayılan arka plan
 
-    # Kullanıcı avatarını ekleme
+    # Rank kısmı için ayrı görsel
+    rank_gorsel = Image.new("RGBA", (300, 100), (0, 0, 0, 128))  # Şeffaf arka plan
+    draw_rank = ImageDraw.Draw(rank_gorsel)
+    font_rank = ImageFont.truetype("arial.ttf", 30)
+    draw_rank.text((20, 20), f"Rank #{rank}", font=font_rank, fill=(255, 255, 255))
+    draw_rank.text((20, 60), f"Level {level}", font=font_rank, fill=(255, 255, 255))
+
+    # İlerleme çubuğu
+    ilerleme_cubugu = Image.new("RGBA", (600, 30), (0, 0, 0, 128))  # Şeffaf arka plan
+    draw_ilerleme = ImageDraw.Draw(ilerleme_cubugu)
+    draw_ilerleme.rounded_rectangle((0, 0, 600, 30), fill=(88, 101, 242), radius=15)
+    ilerleme_yuzdesi = current_xp / required_xp
+    ilerleme_genisligi = int(600 * ilerleme_yuzdesi)
+    draw_ilerleme.rounded_rectangle((0, 0, ilerleme_genisligi, 30), fill=(158, 135, 255), radius=15)
+
+    # Avatar
     avatar = get_user_avatar(user)
-    image.paste(avatar, (20, 20), avatar)
 
-    # Aktiflik durumunu gösteren yuvarlak çizme
-    status_color = get_user_status_color(user)
-    draw.ellipse((90, 90, 110, 110), fill=status_color)
+    # Ana rank kartı
+    ana_kart = Image.new("RGBA", (800, 250), (0, 0, 0, 0))  # Şeffaf arka plan
+    ana_kart.paste(arkaplan, (0, 0))
+    ana_kart.paste(avatar, (20, 20), avatar)
+    ana_kart.paste(rank_gorsel, (150, 20), rank_gorsel)
+    ana_kart.paste(ilerleme_cubugu, (150, 150), ilerleme_cubugu)
 
-    # Kullanıcı adını ekleme
-    draw.text((140, 20), f"{user.name}", font=font, fill=(255, 255, 255))
-
-    # Sıralama ve seviyeyi ekleme
-    draw.text((400, 20), f"RÜTBE #{rank} SEVİYE {level}", font=font, fill=(255, 255, 255))
-
-    # XP bilgisini ekleme
-    draw.text((600, 20), f"{current_xp} / {required_xp} XP", font=font, fill=(255, 255, 255))
-
-    # İlerleme çubuğu oluşturma
-    progress_bar_width = 600
-    progress_bar_height = 30
-    progress_bar_x = 140
-    progress_bar_y = 100
-
-    draw.rectangle((progress_bar_x, progress_bar_y, progress_bar_x + progress_bar_width, progress_bar_y + progress_bar_height), fill=(88, 101, 242))
-
-    # İlerleme miktarını hesaplama
-    progress_percentage = current_xp / required_xp
-    progress_width = int(progress_bar_width * progress_percentage)
-
-    draw.rectangle((progress_bar_x, progress_bar_y, progress_bar_x + progress_width, progress_bar_y + progress_bar_height), fill=(158, 135, 255))
+    # XP bilgisi
+    draw_ana = ImageDraw.Draw(ana_kart)
+    font_xp = ImageFont.truetype("arial.ttf", 20)
+    draw_ana.text((150, 190), f"{current_xp} / {required_xp} XP", font=font_xp, fill=(255, 255, 255))
 
     # Resmi bellekte saklama
     image_bytes = io.BytesIO()
-    image.save(image_bytes, format="PNG")
+    ana_kart.save(image_bytes, format="PNG")
     image_bytes.seek(0)
 
     return image_bytes
@@ -147,6 +158,13 @@ def add_xp(guild_id, user_id, xp):
 
     if user_id not in data[guild_id]:
         data[guild_id][user_id] = 0
+
+    data[guild_id][user_id] += xp
+
+    with open("xp.json", "w") as f:
+        json.dump(data, f)
+
+data[guild_id][user_id] = 0
 
     data[guild_id][user_id] += xp
 
@@ -207,6 +225,19 @@ async def rank(ctx, user: discord.Member = None):
 
     image_bytes = create_rank_image(user, rank, level, current_xp, required_xp)
     await ctx.send(file=discord.File(image_bytes, "rank.png"))
+
+# Arka plan URL'sini ayarlama komutu
+@bot.command()
+async def arkaplan(ctx, url: str):
+    with open("arkaplanlar.json", "r") as f:
+        arkaplanlar = json.load(f)
+
+    arkaplanlar[str(ctx.author.id)] = url
+
+    with open("arkaplanlar.json", "w") as f:
+        json.dump(arkaplanlar, f)
+
+    await ctx.send("Arka plan URL'niz ayarlandı.")
 
 # Bot hazır olduğunda çalışacak kod
 @bot.event
