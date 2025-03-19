@@ -8,7 +8,6 @@ TOKEN = os.environ.get("DISCORD_TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
-tree = discord.app_commands.CommandTree(bot)
 
 def hex_to_int(hex_code):
     hex_code = hex_code.lstrip("#")
