@@ -1,5 +1,7 @@
 import discord
 from discord.ext import commands
+from PIL import Image, ImageDraw, ImageFont
+import io
 import random
 import json
 import os
@@ -17,6 +19,31 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 if not os.path.exists("xp.json"):
     with open("xp.json", "w") as f:
         json.dump({}, f)
+
+def create_rank_image(user, rank, xp):
+    # Arka plan resmi oluşturma veya yükleme
+    image = Image.new("RGB", (600, 200), color=(54, 57, 63))  # Discord'un koyu temasına uygun renk
+
+    draw = ImageDraw.Draw(image)
+
+    # Yazı tipi ve boyutunu ayarlama
+    font = ImageFont.truetype("arial.ttf", 30)  # Arial yazı tipini kullanıyoruz, isterseniz başka bir yazı tipi kullanabilirsiniz
+
+    # Kullanıcı adını ekleme
+    draw.text((20, 20), f"Kullanıcı: {user.name}", font=font, fill=(255, 255, 255))
+
+    # Sıralamayı ekleme
+    draw.text((20, 80), f"Sıralama: {rank}", font=font, fill=(255, 255, 255))
+
+    # XP'yi ekleme
+    draw.text((20, 140), f"XP: {xp}", font=font, fill=(255, 255, 255))
+
+    # Resmi bellekte saklama
+    image_bytes = io.BytesIO()
+    image.save(image_bytes, format="PNG")
+    image_bytes.seek(0)
+
+    return image_bytes
 
 @bot.command()
 async def rank(ctx, user: discord.Member = None):
@@ -48,7 +75,11 @@ async def rank(ctx, user: discord.Member = None):
             rank = i + 1
             break
 
-    await ctx.send(f"{user.mention} - Sıralama: {rank}, XP: {user_xp}")
+    # Görseli oluşturma
+    image_bytes = create_rank_image(user, rank, user_xp)
+
+    # Görseli gönderme
+    await ctx.send(file=discord.File(image_bytes, "rank.png"))
 
 # XP ekleme fonksiyonu
 def add_xp(guild_id, user_id, xp):
