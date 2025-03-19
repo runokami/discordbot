@@ -136,7 +136,7 @@ def create_rank_image(user, rank, level, current_xp, required_xp):
     # XP bilgisi
     draw_ana = ImageDraw.Draw(ana_kart)
     font_xp = ImageFont.truetype("arial.ttf", 20)
-    draw_ana.text((150, 190), f"{current_xp} / {required_xp} XP", font=font_xp, fill=(255, 255, 255))
+    draw_ana.text((150, 120), f"{current_xp} / {required_xp} XP", font=font_xp, fill=(255, 255, 255))
 
     # Resmi bellekte saklama
     image_bytes = io.BytesIO()
@@ -158,13 +158,6 @@ def add_xp(guild_id, user_id, xp):
 
     if user_id not in data[guild_id]:
         data[guild_id][user_id] = 0
-
-    data[guild_id][user_id] += xp
-
-    with open("xp.json", "w") as f:
-        json.dump(data, f)
-
-data[guild_id][user_id] = 0
 
     data[guild_id][user_id] += xp
 
