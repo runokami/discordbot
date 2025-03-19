@@ -49,7 +49,7 @@ def get_user_status_color(user):
     if status == discord.Status.online:
         return (0, 255, 0)  # Yeşil
     elif status == discord.Status.idle:
-        return (255, 255, 0)  # Sarı
+        return (255, 235, 0)  # Sarı
     elif status == discord.Status.dnd:
         return (255, 0, 0)  # Kırmızı
     else:
@@ -112,8 +112,8 @@ def create_rank_image(user, rank, level, current_xp, required_xp):
     rank_gorsel = Image.new("RGBA", (300, 100), (0, 0, 0, 128))  # Şeffaf arka plan
     draw_rank = ImageDraw.Draw(rank_gorsel)
     font_rank = ImageFont.truetype("arial.ttf", 30)
-    draw_rank.text((20, 20), f"Rank #{rank}", font=font_rank, fill=(255, 255, 255))
-    draw_rank.text((20, 60), f"Level {level}", font=font_rank, fill=(255, 255, 255))
+    draw_rank.text((140, 20), f"Rank #{rank}", font=font_rank, fill=(255, 255, 255))
+    draw_rank.text((180, 20), f"Level {level}", font=font_rank, fill=(255, 255, 255))
 
     # İlerleme çubuğu
     ilerleme_cubugu = Image.new("RGBA", (600, 30), (0, 0, 0, 128))  # Şeffaf arka plan
