@@ -6,6 +6,7 @@ import io
 import requests
 from io import BytesIO
 import os
+import random
 
 # Ortam değişkeninden bot token'ını al
 TOKEN = os.environ.get("DISCORD_TOKEN")
