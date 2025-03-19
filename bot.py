@@ -18,6 +18,11 @@ if not os.path.exists("xp.json"):
     with open("xp.json", "w") as f:
         json.dump({}, f)
 
+# XP ekleme fonksiyonu
+def add_xp(guild_id, user_id, xp):
+    with open("xp.json", "r") as f:
+        data = json.load(f)
+
     guild_id = str(guild_id)
     user_id = str(user_id)
 
@@ -58,17 +63,21 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    xp = distribute_random_xp(message.guild.id, message.author.id)
+    # guild_id, mesajın gönderildiği sunucunun ID'sidir
+    guild_id = message.guild.id
+
+    # user_id, mesajı gönderen kullanıcının ID'sidir
+    user_id = message.author.id
+
+    xp = distribute_random_xp(guild_id, user_id)
     print(f"{message.guild.name} sunucusunda {message.author.name} kullanıcısına {xp} XP eklendi.")
 
     await bot.process_commands(message) # Komutları işle
-
 
 # Bot hazır olduğunda çalışacak kod
 @bot.event
 async def on_ready():
     print(f"{bot.user} olarak giriş yaptık!")
-    await tree.sync()
 
 # Botu çalıştır
 bot.run(TOKEN)
