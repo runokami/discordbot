@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 import json
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io
 import requests
 from io import BytesIO
