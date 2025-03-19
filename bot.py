@@ -26,6 +26,9 @@ def create_rank_image(user, rank, xp):
 
     draw = ImageDraw.Draw(image)
 
+    # Yazı tipi ve boyutunu ayarlama (varsayılan yazı tipi)
+    font = ImageFont.load_default()
+
     # Kullanıcı adını ekleme
     draw.text((20, 20), f"Kullanıcı: {user.name}", font=font, fill=(255, 255, 255))
 
