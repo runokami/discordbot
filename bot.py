@@ -129,14 +129,21 @@ def create_rank_image(user, rank, level, current_xp, required_xp):
     # Ana rank kartı
     ana_kart = Image.new("RGBA", (800, 250), (0, 0, 0, 0))  # Şeffaf arka plan
     ana_kart.paste(arkaplan, (0, 0))
-    ana_kart.paste(avatar, (20, 20), avatar)
+    ana_kart.paste(avatar, (20, 50), avatar) # Avatar konumunu düzelttim
     ana_kart.paste(rank_gorsel, (150, 20), rank_gorsel)
     ana_kart.paste(ilerleme_cubugu, (150, 150), ilerleme_cubugu)
 
-    # XP bilgisi
+    # Kullanıcı ismi
     draw_ana = ImageDraw.Draw(ana_kart)
     font_xp = ImageFont.truetype("arial.ttf", 20)
+    draw_ana.text((150, 60), f"{user.name}", font=font_xp, fill=(255, 255, 255))
+
+    # XP bilgisi
     draw_ana.text((150, 120), f"{current_xp} / {required_xp} XP", font=font_xp, fill=(255, 255, 255))
+
+    # Aktiflik durumu
+    status_color = get_user_status_color(user)
+    draw_ana.ellipse((120, 90, 140, 110), fill=status_color) # Aktiflik durumu konumunu düzelttim
 
     # Resmi bellekte saklama
     image_bytes = io.BytesIO()
