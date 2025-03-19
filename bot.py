@@ -18,6 +18,38 @@ if not os.path.exists("xp.json"):
     with open("xp.json", "w") as f:
         json.dump({}, f)
 
+@bot.command()
+async def rank(ctx, user: discord.Member = None):
+    if user is None:
+        user = ctx.author
+
+    guild_id = str(ctx.guild.id)
+
+    with open("xp.json", "r") as f:
+        data = json.load(f)
+
+    if guild_id not in data:
+        await ctx.send("Bu sunucuda henüz XP verisi yok.")
+        return
+
+    users = data[guild_id]
+
+    if str(user.id) not in users:
+        await ctx.send("Bu kullanıcının henüz XP'si yok.")
+        return
+
+    user_xp = users[str(user.id)]
+
+    sorted_users = sorted(users.items(), key=lambda x: x[1], reverse=True)
+
+    rank = 0
+    for i, (user_id, xp) in enumerate(sorted_users):
+        if str(user.id) == str(user.id):
+            rank = i + 1
+            break
+
+    await ctx.send(f"{user.mention} - Sıralama: {rank}, XP: {user_xp}")
+
 # XP ekleme fonksiyonu
 def add_xp(guild_id, user_id, xp):
     with open("xp.json", "r") as f:
