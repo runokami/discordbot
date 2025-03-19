@@ -4,14 +4,15 @@ import random
 import json
 import os
 
-# Bot token'ınızı buraya girin
-TOKEN = "BOT_TOKEN"
+# Ortam değişkeninden bot token'ını al
+TOKEN = os.environ.get("DISCORD_TOKEN")
 
 # Tüm intent'leri etkinleştir
 intents = discord.Intents.all()
 
 # Bot nesnesini oluştur
 bot = commands.Bot(command_prefix="!", intents=intents)
+tree = discord.app_commands.CommandTree(bot)
 
 # Veri dosyasını oluştur (gerekirse)
 if not os.path.exists("xp.json"):
@@ -68,10 +69,26 @@ async def on_message(message):
 
     await bot.process_commands(message) # Komutları işle
 
+# /xp komutu
+@tree.command(name="xp", description="XP'nizi gösterir.")
+async def xp_slash(interaction: discord.Interaction):
+    with open("xp.json", "r") as f:
+        data = json.load(f)
+
+    guild_id = str(interaction.guild.id)
+    user_id = str(interaction.user.id)
+
+    if guild_id in data and user_id in data[guild_id]:
+        xp = data[guild_id][user_id]
+        await interaction.response.send_message(f"XP'niz: {xp}")
+    else:
+        await interaction.response.send_message("Henüz XP'niz yok.")
+
 # Bot hazır olduğunda çalışacak kod
 @bot.event
 async def on_ready():
     print(f"{bot.user} olarak giriş yaptık!")
+    await tree.sync()
 
 # Botu çalıştır
 bot.run(TOKEN)
