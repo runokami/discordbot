@@ -22,12 +22,34 @@ if not os.path.exists("xp.json"):
     with open("xp.json", "w") as f:
         json.dump({}, f)
 
-# Kullanıcı avatarını indirme ve yeniden boyutlandırma
+# Kullanıcı avatarını indirme ve yuvarlak hale getirme
 def get_user_avatar(user):
     avatar_url = user.avatar.url
     response = requests.get(avatar_url)
     avatar = Image.open(BytesIO(response.content)).resize((100, 100))
+
+    # Yuvarlak maske oluşturma
+    mask = Image.new('L', (100, 100), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, 100, 100), fill=255)
+
+    # Avatarı maskeye uygulama
+    avatar = ImageOps.fit(avatar, mask.size, centering=(0.5, 0.5))
+    avatar.putalpha(mask)
+
     return avatar
+
+# Kullanıcının aktiflik durumunu alma
+def get_user_status_color(user):
+    status = user.status
+    if status == discord.Status.online:
+        return (0, 255, 0)  # Yeşil
+    elif status == discord.Status.idle:
+        return (255, 255, 0)  # Sarı
+    elif status == discord.Status.dnd:
+        return (255, 0, 0)  # Kırmızı
+    else:
+        return (128, 128, 128)  # Gri
 
 # Kullanıcının seviyesini ve XP ilerlemesini hesaplama
 def calculate_level(xp):
@@ -76,7 +98,7 @@ def create_rank_image(user, rank, level, current_xp, required_xp):
 
     # Kullanıcı avatarını ekleme
     avatar = get_user_avatar(user)
-    image.paste(avatar, (20, 20))
+    image.paste(avatar, (20, 50))
 
     # Kullanıcı adını ekleme
     draw.text((140, 20), f"{user.name}", font=font, fill=(255, 255, 255))
