@@ -9,12 +9,6 @@ from io import BytesIO
 import os
 import random
 
-import discord
-from discord.ext import commands
-from discord import app_commands
-import json
-import os
-
 TOKEN = os.environ.get("DISCORD_TOKEN")
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -90,7 +84,22 @@ async def embed(ctx):
     color = color_message.content
 
     try:
-        color = discord.Color.from_str
+        color = discord.Color.from_str(color) # Düzeltilen satır
+    except ValueError:
+        color = discord.Color.blue()
+
+    embed = discord.Embed(
+        title=title.content,
+        description=description.content,
+        color=color
+    )
+    embeds = get_embeds(ctx.guild.id)
+    embed_id = len(embeds) + 1
+    embeds[embed_id] = embed.to_dict()
+    set_embeds(ctx.guild.id, embeds)
+
+    await ctx.send(embed=embed)
+
 @bot.tree.command(name="embed_show", description="Belirli bir embed'i gösterir.")
 async def embed_show_slash(interaction: discord.Interaction, embed_id: int):
     embeds = get_embeds(interaction.guild.id)
